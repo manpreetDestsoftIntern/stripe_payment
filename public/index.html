@@ -9,10 +9,10 @@
 
   <script>
     document.getElementById("checkout").onclick = async () => {
-      const res = await fetch("/api/payment/checkout", {
+      const res = await fetch("/api/payment/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: "USER_ID", orgId: "ORG_ID", priceId: "price_XXXX" })
+        body: JSON.stringify({ userId: "USER_ID", orgId: "ORG_ID" })
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;

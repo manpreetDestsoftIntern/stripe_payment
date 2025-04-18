@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Details</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .payment-info { margin-bottom: 15px; border: 1px solid #ccc; padding: 10px; border-radius: 5px; }
+        .payment-info h3 { margin-top: 0; }
+    </style>
+</head>
+<body>
+    <h1>User Payment Details</h1>
+    <div id="paymentDetails">
+        <p>Loading payment information...</p>
+    </div>
+
+    <script>
+        async function fetchPaymentDetails() {
+            // Replace 'YOUR_USER_ID' with the actual user ID you want to fetch details for
+            const userId = getUserIdFromURL(); // Implement this function
+
+            if (!userId) {
+                document.getElementById('paymentDetails').innerText = 'User ID not provided.';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/payment/payment-details/${userId}`);
+                if (!response.ok) {
+                    const error = await response.json();
+                    document.getElementById('paymentDetails').innerText = `Error: ${error.error || 'Failed to fetch payment details'}`;
+                    return;
+                }
+                const data = await response.json();
+
+                const paymentDetailsDiv = document.getElementById('paymentDetails');
+                paymentDetailsDiv.innerHTML = ''; // Clear loading message
+
+                if (data.customer) {
+                    const customerDiv = document.createElement('div');
+                    customerDiv.classList.add('payment-info');
+                    customerDiv.innerHTML = `
+                        <h3>Customer Information</h3>
+                        <p>ID: ${data.customer.id}</p>
+                        <p>Email: ${data.customer.email}</p>
+                        `;
+                    paymentDetailsDiv.appendChild(customerDiv);
+                }
+
+                if (data.paymentMethods && data.paymentMethods.length > 0) {
+                    data.paymentMethods.forEach(method => {
+                        const methodDiv = document.createElement('div');
+                        methodDiv.classList.add('payment-info');
+                        methodDiv.innerHTML = `
+                            <h3>Payment Method</h3>
+                            <p>ID: ${method.id}</p>
+                            <p>Type: ${method.type}</p>
+                            <p>Brand: ${method.card.brand}</p>
+                            <p>Last 4: ${method.card.last4}</p>
+                            <p>Expiry: ${method.card.exp_month}/${method.card.exp_year}</p>
+                            `;
+                        paymentDetailsDiv.appendChild(methodDiv);
+                    });
+                } else {
+                    const noMethods = document.createElement('p');
+                    noMethods.innerText = 'No payment methods found for this user.';
+                    paymentDetailsDiv.appendChild(noMethods);
+                }
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('paymentDetails').innerText = 'An unexpected error occurred.';
+            }
+        }
+
+        function getUserIdFromURL() {
+            // This is a basic example. You might need a more robust way to get the user ID
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('userId');
+        }
+
+        // Call the function to fetch details when the page loads
+        window.onload = fetchPaymentDetails;
+    </script>
+</body>
+</html>

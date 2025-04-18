@@ -2,48 +2,62 @@ const express = require('express');
 const router = express.Router();
 const Stripe = require('stripe');
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-const Organization = require('../models/Organization');
 const User = require('../models/User');
-const CheckoutSession = require('../models/CheckoutSession');
 
-router.post('/checkout', async (req, res) => {
-  const { userId, orgId, priceId } = req.body;
+router.post('/create-checkout-session', async (req, res) => {
+  const {  priceId } = req.body;
+  const email = "manu@gmail.com";
+  try {
+    // 1. Create a new user in your application database
+    const newUser = new User({ email }); // You might want to add more user fields
+    await newUser.save();
 
-  const user = await User.findById(userId);
-  const org = await Organization.findById(orgId);
-  if (!user || !org) return res.status(400).json({ error: "Invalid user or organization" });
+    // 2. Create a Stripe customer
+    const customer = await stripe.customers.create({
+      email: newUser.email,
+    });
 
-  if (user.role !== 'admin') return res.status(403).json({ error: "Only admins can pay." });
+    // 3. Update the user with the Stripe customer ID
+    newUser.stripeCustomerId = customer.id;
+    await newUser.save();
 
-  if (org.stripeSubscriptionId) {
-    const sub = await stripe.subscriptions.retrieve(org.stripeSubscriptionId);
-    if (sub && sub.status === 'active') {
-      return res.status(400).json({ error: "Subscription already active." });
+    // 4. Create a Stripe checkout session
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: customer.id,
+      line_items: [{ price: priceId || "price_1RFAbuRvAb4uboGCSO1L02u4", quantity: 1 }],
+      success_url: `${process.env.BASE_URL}/success.html?userId=${newUser._id}`, // Pass user ID on success
+      cancel_url: `${process.env.BASE_URL}/cancel.html`,
+    });
+
+    res.json({ url: session.url, sessionId: session.id, userId: newUser._id });
+  } catch (error) {
+    console.error("Error creating user and checkout session:", error);
+    res.status(500).json({ error: "Failed to create user and checkout session." });
+  }
+});
+
+
+router.get('/payment-details/:userId', async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user || !user.stripeCustomerId) {
+      return res.status(404).json({ error: 'User or Stripe customer ID not found.' });
     }
+
+    const customer = await stripe.customers.retrieve(user.stripeCustomerId);
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: user.stripeCustomerId,
+      type: 'card',
+    });
+
+    res.json({ customer, paymentMethods: paymentMethods.data });
+  } catch (error) {
+    console.error('Error fetching payment details:', error);
+    res.status(500).json({ error: 'Failed to fetch payment details.' });
   }
-
-  const existing = await CheckoutSession.findOne({ orgId, status: 'pending' });
-  if (existing) return res.status(400).json({ error: "A session is already in progress." });
-
-  let customerId = org.stripeCustomerId;
-  if (!customerId) {
-    const customer = await stripe.customers.create({ email: user.email });
-    customerId = customer.id;
-    org.stripeCustomerId = customerId;
-    await org.save();
-  }
-
-  const session = await stripe.checkout.sessions.create({
-    mode: 'subscription',
-    customer: customerId,
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${process.env.BASE_URL}/success.html`,
-    cancel_url: `${process.env.BASE_URL}/cancel.html`,
-  });
-
-  await CheckoutSession.create({ sessionId: session.id, orgId, status: 'pending' });
-
-  res.json({ url: session.url });
 });
 
 module.exports = router;
