@@ -12,6 +12,7 @@ app.use(express.static('public'));
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 
 // Routes
+app.use('/api/newPayment', require('./routes/newPayment'));
 app.use('/api/payment', require('./routes/payment'));
 app.use('/api/webhook', require('./routes/webhook'));
 

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Add Payment Method</title>
+</head>
+<body>
+  <button id="add-payment-method">Add Payment Method</button>
+
+  <script>
+    document.getElementById('add-payment-method').addEventListener('click', async () => {
+      try {
+        const response = await fetch('/api/newPayment/add_pm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        const data = await response.json();
+
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          console.error('Error:', data.error);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    });
+  </script>
+</body>
+</html>
